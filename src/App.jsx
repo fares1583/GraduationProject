@@ -1,204 +1,306 @@
-import React, { useState } from 'react';
-import { FileUp, Table, Calculator, Bean as Mean, Sigma, FunctionSquare as Functions, ArrowDownNarrowWide, Hash } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { StatisticsPanel } from './components/StatisticsPanel';
+import { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
 import {
-  calculateMean,
-  calculateVariance,
-  calculateStandardDeviation,
-  calculateMedian,
-  calculateMode,
-} from './utils/statistics';
+  mean,
+  variance,
+  standardDeviation,
+  median,
+  mode,
+} from "simple-statistics";
+import "./App.css";
 
 function App() {
-  const [data, setData] = useState([]);
-  const [columns, setColumns] = useState([]);
+  const [data, setData] = useState(null);
+  const [selectedColumn, setSelectedColumn] = useState("");
   const [stats, setStats] = useState({});
+  const [errors, setErrors] = useState({});
+  const [fileName, setFileName] = useState(""); // State variable for file name
+  const [selectedStats, setSelectedStats] = useState({
+    mean: false,
+    variance: false,
+    standardDeviation: false,
+    median: false,
+    mode: false,
+    count: false,
+  });
+  const [activeTab, setActiveTab] = useState("descriptive");
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    setFileName(
+      file.name.substring(0, file.name.lastIndexOf(".")) || file.name
+    ); // Update file name state
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const workbook = XLSX.read(e.target?.result, { type: 'binary' });
+
+    reader.onload = (event) => {
+      const workbook = XLSX.read(event.target.result, { type: "binary" });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
-      
       setData(jsonData);
-      if (jsonData.length > 0) {
-        setColumns(Object.keys(jsonData[0]));
-      }
+      setStats({});
+      setErrors({});
+      setSelectedColumn("");
     };
+
     reader.readAsBinaryString(file);
   };
 
-  const calculateStat = (statType) => {
-    const newStats = { ...stats };
-    
-    columns.forEach(column => {
-      const values = data.map(row => parseFloat(row[column])).filter(val => !isNaN(val));
-      
-      if (values.length > 0) {
-        if (!newStats[column]) {
-          newStats[column] = { values };
-        }
-
-        switch (statType) {
-          case 'mean':
-            newStats[column].mean = calculateMean(values);
-            break;
-          case 'variance':
-            newStats[column].variance = calculateVariance(values);
-            break;
-          case 'standardDeviation':
-            newStats[column].standardDeviation = calculateStandardDeviation(values);
-            break;
-          case 'median':
-            newStats[column].median = calculateMedian(values);
-            break;
-          case 'mode':
-            newStats[column].mode = calculateMode(values);
-            break;
-          case 'all':
-            newStats[column] = {
-              values,
-              mean: calculateMean(values),
-              variance: calculateVariance(values),
-              standardDeviation: calculateStandardDeviation(values),
-              median: calculateMedian(values),
-              mode: calculateMode(values),
-            };
-            break;
-        }
-      }
-    });
-    
-    setStats(newStats);
+  const getValidNumbers = () => {
+    if (!selectedColumn || !data) return [];
+    return data
+      .map((row) => parseFloat(row[selectedColumn]))
+      .filter((val) => !isNaN(val));
   };
 
-  return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h1 className="text-3xl font-bold mb-6 text-gray-800 flex items-center gap-2">
-            <Table className="w-8 h-8" />
-            Excel Statistics Analyzer
-          </h1>
-          
-          <div className="mb-6">
-            <label className="flex items-center justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-lg appearance-none cursor-pointer hover:border-gray-400 focus:outline-none">
-              <div className="flex flex-col items-center space-y-2">
-                <FileUp className="w-8 h-8 text-gray-400" />
-                <span className="font-medium text-gray-600">
-                  Drop Excel file or click to upload
-                </span>
-              </div>
-              <input
-                type="file"
-                className="hidden"
-                accept=".xlsx,.xls"
-                onChange={handleFileUpload}
-              />
-            </label>
-          </div>
+  const calculateStat = (type) => {
+    const numbers = getValidNumbers();
+    setErrors((prev) => ({ ...prev, [type]: null }));
 
-          {data.length > 0 && (
-            <>
-              <div className="mb-6 flex flex-wrap gap-2">
-                <button
-                  onClick={() => calculateStat('all')}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Calculator className="w-5 h-5" />
-                  Calculate All
-                </button>
-                <button
-                  onClick={() => calculateStat('mean')}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <Mean className="w-5 h-5" />
-                  Mean
-                </button>
-                <button
-                  onClick={() => calculateStat('variance')}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                >
-                  <Sigma className="w-5 h-5" />
-                  Variance
-                </button>
-                <button
-                  onClick={() => calculateStat('standardDeviation')}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                >
-                  <Functions className="w-5 h-5" />
-                  Standard Deviation
-                </button>
-                <button
-                  onClick={() => calculateStat('median')}
-                  className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-                >
-                  <ArrowDownNarrowWide className="w-5 h-5" />
-                  Median
-                </button>
-                <button
-                  onClick={() => calculateStat('mode')}
-                  className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-                >
-                  <Hash className="w-5 h-5" />
-                  Mode
-                </button>
-              </div>
+    if (numbers.length === 0) {
+      setErrors((prev) => ({
+        ...prev,
+        [type]: "No valid numerical data in this column",
+      }));
+      setStats((prev) => ({ ...prev, [type]: null }));
+      return;
+    }
 
-              <div className="border rounded-lg shadow-sm">
-                <div className="max-h-[250px] overflow-auto">
-                  <table className="min-w-full bg-white">
-                    <thead className="bg-gray-50 sticky top-0 z-10">
-                      <tr>
-                        {columns.map((column) => (
-                          <th
-                            key={column}
-                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                          >
-                            {column}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {data.map((row, index) => (
-                        <tr key={index}>
-                          {columns.map((column) => (
-                            <td
-                              key={column}
-                              className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
-                            >
-                              {row[column]}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          )}
+    try {
+      let result;
+      switch (type) {
+        case "mean":
+          result = mean(numbers).toFixed(2);
+          break;
+        case "variance":
+          result = variance(numbers).toFixed(2);
+          break;
+        case "standardDeviation":
+          result = standardDeviation(numbers).toFixed(2);
+          break;
+        case "median":
+          result = median(numbers).toFixed(2);
+          break;
+        case "mode":
+          result = mode(numbers).toFixed(2);
+          break;
+        case "count":
+          result = numbers.length;
+          break;
+        default:
+          throw new Error("Unknown calculation type");
+      }
+      setStats((prev) => ({ ...prev, [type]: result }));
+    } catch (error) {
+      setErrors((prev) => ({
+        ...prev,
+        [type]: "Could not calculate this statistic",
+      }));
+      setStats((prev) => ({ ...prev, [type]: null }));
+    }
+  };
+
+  useEffect(() => {
+    // Calculate stats when checkboxes change
+    Object.entries(selectedStats).forEach(([type, isSelected]) => {
+      if (isSelected) {
+        calculateStat(type);
+      } else {
+        setStats((prev) => ({ ...prev, [type]: null }));
+        setErrors((prev) => ({ ...prev, [type]: null }));
+      }
+    });
+  }, [selectedStats, selectedColumn]);
+
+  const getColumns = () => {
+    if (!data || data.length === 0) return [];
+    return Object.keys(data[0]);
+  };
+
+  const handleCheckboxChange = (type) => {
+    setSelectedStats((prev) => ({
+      ...prev,
+      [type]: !prev[type],
+    }));
+  };
+
+  const StatCard = ({ type, label }) =>
+    selectedStats[type] && (
+      <div className="stat-item">
+        <div className="stat-header">
+          <label>{label}</label>
         </div>
-
-        {Object.keys(stats).length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(stats).map(([columnName, columnStats]) => (
-              <StatisticsPanel
-                key={columnName}
-                columnName={columnName}
-                stats={columnStats}
-              />
-            ))}
-          </div>
+        {errors[type] ? (
+          <div className="error-message">{errors[type]}</div>
+        ) : (
+          <span className={stats[type] ? "stat-value" : "stat-empty"}>
+            {stats[type] || "Calculating..."}
+          </span>
         )}
       </div>
+    );
+
+  const StatCheckbox = ({ type, label }) => (
+    <div className="stat-checkbox-container">
+      <label className="stat-checkbox-label">
+        <input
+          type="checkbox"
+          checked={selectedStats[type]}
+          onChange={() => handleCheckboxChange(type)}
+          disabled={!selectedColumn}
+          className="stat-checkbox"
+        />
+        {label}
+      </label>
+    </div>
+  );
+
+  return (
+    <div className="container">
+      <h1>Statistics Calculator</h1>
+
+      {/* <div className="upload-section">
+        <input
+          type="file"
+          accept=".xlsx, .xls"
+          onChange={handleFileUpload}
+          className="file-input"
+        />
+      </div> */}
+      <div className="upload-section">
+        <label htmlFor="file-upload" className="input-div">
+          <input
+            id="file-upload"
+            className="input"
+            name="file"
+            type="file"
+            accept=".xlsx, .xls"
+            onChange={handleFileUpload}
+          />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="1em"
+            height="1em"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            viewBox="0 0 24 24"
+            strokeWidth="2"
+            fill="none"
+            stroke="currentColor"
+            className="icon"
+          >
+            <polyline points="16 16 12 12 8 16"></polyline>
+            <line y2="21" x2="12" y1="12" x1="12"></line>
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path>
+            <polyline points="16 16 12 12 8 16"></polyline>
+          </svg>
+        </label>
+        {fileName && <p className="file-name">{fileName}</p>}
+      </div>
+
+      {data && (
+        <div className="data-section">
+          <h2>Data Preview</h2>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  {getColumns().map((column) => (
+                    <th key={column}>{column}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.slice(0).map((row, index) => (
+                  <tr key={index}>
+                    {getColumns().map((column) => (
+                      <td key={column}>{row[column]}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="column-select-container">
+            <select
+              value={selectedColumn}
+              onChange={(e) => {
+                setSelectedColumn(e.target.value);
+                setStats({});
+                setErrors({});
+              }}
+              className="column-select"
+            >
+              <option value="">Select a column</option>
+              {getColumns().map((column) => (
+                <option key={column} value={column}>
+                  {column}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedColumn && (
+            <div className="stats-container">
+              <div className="tabs">
+                <button
+                  className={`tab-button ${
+                    activeTab === "descriptive" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveTab("descriptive")}
+                >
+                  Descriptive Statistics
+                </button>
+                <button
+                  className={`tab-button ${
+                    activeTab === "hypothesis" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveTab("hypothesis")}
+                >
+                  Hypothesis Tests
+                </button>
+              </div>
+
+              {activeTab === "descriptive" && (
+                <div className="tab-content">
+                  <h2>Statistics for {selectedColumn}</h2>
+
+                  <div className="checkboxes-container">
+                    <StatCheckbox type="mean" label="Mean" />
+                    <StatCheckbox type="variance" label="Variance" />
+                    <StatCheckbox
+                      type="standardDeviation"
+                      label="Standard Deviation"
+                    />
+                    <StatCheckbox type="median" label="Median" />
+                    <StatCheckbox type="mode" label="Mode" />
+                    <StatCheckbox type="count" label="Count" />
+                  </div>
+
+                  <div className="stats-grid">
+                    <StatCard type="mean" label="Mean" />
+                    <StatCard type="variance" label="Variance" />
+                    <StatCard
+                      type="standardDeviation"
+                      label="Standard Deviation"
+                    />
+                    <StatCard type="median" label="Median" />
+                    <StatCard type="mode" label="Mode" />
+                    <StatCard type="count" label="Count" />
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "hypothesis" && (
+                <div className="tab-content">
+                  <h2>Hypothesis Tests</h2>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
